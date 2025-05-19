@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
-financial_params = dict(yearly_interest=0.140830823529, yearly_inflation=0.059171235294, time_length_year=100, age_of_contribution_year=28,
-                        contribution_length_year=20, income_age_year=50, passive_income_value=8000,
-                        contribution_value=1000, reference_year=2025, reference_month=1, birth_year=1980, birth_month=8)
+financial_params = dict(yearly_interest=0.13499942436095425, yearly_inflation=0.059171235294, time_length_year=100, age_of_contribution_year=28,
+                        contribution_length_year=20, income_age_year=52, passive_income_value=8000,
+                        contribution_value=1, reference_year=2025, reference_month=1, birth_year=1980, birth_month=8)
 
 
 def print_hi(name):
@@ -20,7 +20,7 @@ def print_hi(name):
     print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
 
 
-def assets_projection(financial_params):
+def assets_projection(financial_params, refresh=False):
     yearly_interest = financial_params['yearly_interest']
     yearly_inflation = financial_params['yearly_inflation']
     time_length_year = financial_params['time_length_year']
@@ -65,10 +65,11 @@ def assets_projection(financial_params):
             capital_contribution = pd.Series(capital_contribution).fillna(float(0))
 
             # Adding the contribution value for the first year
+            temp = 0
             for i, s in enumerate(df_loaded['Locked'][age_of_contribution_year * 12: age_of_contribution_year * 12 + 12]):
+                temp = contribution_value
                 if not s:  # Se status for False
                     capital_contribution[age_of_contribution_year*12+i] = contribution_value
-                    temp = contribution_value
 
             # it will add the next contributions with the inflation adjustment
             aporte = 0
@@ -145,13 +146,16 @@ def annual_mean_inflation(start_year, code):
 
     return geo_mean
 
+def plot_yield(capital_contribution, Accumulated_amount, passive_income, years, color, name):
+    plt.plot(years, Accumulated_amount[0:1200:6], label=f'{name}: Amount of savings ', color=color)
+    plt.plot(years, passive_income[0:1200:6], label=f'{name}: Passive incomes', color=color)
+    plt.plot(years, capital_contribution[0:1200:6], label=f'{name}: Passive incomes', color=color)
 
 
 
 if __name__ == '__main__':
     print_hi('PyCharm')
 
-refresh = False
 
 # print(df_loaded)  # First 5 rows
 # print(df_loaded.dtypes)  # Column data types
@@ -175,30 +179,111 @@ print(valor_final)
 
 reference_date = dict(year = 2008, month = 1)
 
+# calculate the inflation and index
+IPCA = annual_mean_inflation(f"{reference_date['year']}-01-01","IPCA")
 IGPM = annual_mean_inflation(f"{reference_date['year']}-01-01","IGPM")
 Selic = annual_mean_inflation("2024-04-01","Selic")
-print(f"Mean inflation IGPM: {IGPM}")
-print(f"Mean inflation SELIC: {Selic}")
 itau = (1+IGPM)*(1+0.06) - 1
+print(f"Mean inflation IGPM: {IGPM}")
+print(f"Mean inflation IPCA: {IPCA}")
+print(f"Mean inflation SELIC: {Selic}")
 print(f"Mean yield IGPM+6: {itau}")
 
-financial_params['yearly_inflation'] = annual_mean_inflation(f"{reference_date['year']}-01-01","IPCA")
-financial_params['reference_year'] = reference_date['year']
+years = [i * 0.5 for i in range(0, 200)]
 
-print(f"Mean inflation IPCA: {financial_params['yearly_inflation']}")
-capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params)
+# IGPM + 6%
+refresh = False
+asset_name = "IGPM+6%"
+financial_params['yearly_inflation'] = IPCA
+financial_params['yearly_interest'] = itau
+financial_params['reference_year'] = reference_date['year']
+financial_params['age_of_contribution_year'] = 28
+financial_params['contribution_length_year'] = 17
+financial_params['passive_income_value'] = 4000
+capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, refresh=refresh)
+plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "red")
+
+df = pd.DataFrame(list(zip(capital_contribution, passive_income, [round(p, 2) for p in Accumulated_amount])), columns=[f"{asset_name} Capital_contribution",f"{asset_name} passive_income",f"{asset_name} Accumulated_amount"])
+
+# Finserve Global Security Fund I SEK R
+refresh = True
+asset_name = "Finserve Global Security Fund I SEK R"
+financial_params['yearly_inflation'] = IPCA
+financial_params['yearly_interest'] = 0.2679174
+financial_params['reference_year'] = reference_date['year']
+financial_params['age_of_contribution_year'] = 44
+financial_params['contribution_length_year'] = 1
+financial_params['passive_income_value'] = 1000
+
+capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, refresh=refresh)
+plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "green")
+
+df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
+df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
+df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
+
+
+# Spiltan Globalfond Investmentbolag
+refresh = True
+asset_name = "Spiltan Globalfond Investmentbolag"
+financial_params['yearly_inflation'] = IPCA
+financial_params['yearly_interest'] = 0.2605262
+financial_params['reference_year'] = reference_date['year']
+financial_params['age_of_contribution_year'] = 44
+financial_params['contribution_length_year'] = 1
+financial_params['passive_income_value'] = 1000
+
+capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, refresh=refresh)
+plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "blue")
+
+df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
+df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
+df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
+
+#Tellus Midas
+refresh = True
+asset_name = "Tellus Midas"
+financial_params['yearly_inflation'] = IPCA
+financial_params['yearly_interest'] = 0.2552236
+financial_params['reference_year'] = reference_date['year']
+financial_params['age_of_contribution_year'] = 44
+financial_params['contribution_length_year'] = 1
+financial_params['passive_income_value'] = 1000
+
+capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, refresh=refresh)
+plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "yellow")
+
+df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
+df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
+df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
+
+#East Capital Balkans A1 SEK
+refresh = True
+asset_name = "East Capital Balkans A1 SEK"
+financial_params['yearly_inflation'] = IPCA
+financial_params['yearly_interest'] = 0.2967898
+financial_params['reference_year'] = reference_date['year']
+financial_params['age_of_contribution_year'] = 44
+financial_params['contribution_length_year'] = 1
+financial_params['passive_income_value'] = 1000
+
+capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, refresh=refresh)
+plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "pink")
+
+df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
+df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
+df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
+
+
 
 # It save the lists in a excell file.
-df = pd.DataFrame(list(zip(capital_contribution, passive_income, [round(p, 2) for p in Accumulated_amount])), columns=["Capital_contribution","passive_income","Accumulated_amount"])
 df.to_csv("invest.csv", index=False)  # Remove `index=False` to keep row numbers
 
-years = [i * 0.5 for i in range(0, 200)]
-plt.plot(years, Accumulated_amount[0:1200:6], label='Amount of saving #1', color='red')
-plt.plot(years, passive_income[0:1200:6], label='Passive incomes #1', color='red')
-#plt.plot(years, capital_contribution[0:1200:6], label='Passive incomes #1', color='red')
 plt.title('Yield Projection (2024)')
 plt.xlabel('Month')
 plt.ylabel('Value (BRL)')
+plt.legend()
+plt.grid()
 plt.show()
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
