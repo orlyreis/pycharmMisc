@@ -15,7 +15,6 @@ financial_params = dict(yearly_interest=0.140830823529, yearly_inflation=0.05917
                         contribution_length_year=17, income_age_year=50, passive_income_value=8000,
                         contribution_value=100, reference_year=2025, reference_month=1, birth_year=1980, birth_month=8)
 
-
 def print_hi(name):
     # Use a breakpoint in the code line below to debug your script.
     print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
