@@ -2,7 +2,6 @@
 import numpy as np
 import yfinance as yf
 import investpy
-import requests
 import pandas as pd
 from bcb import sgs
 from datetime import datetime
@@ -12,8 +11,9 @@ import matplotlib.pyplot as plt
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
 financial_params = dict(yearly_interest=0.140830823529, yearly_inflation=0.059171235294, time_length_year=100, age_of_contribution_year=28,
-                        contribution_length_year=17, income_age_year=50, passive_income_value=8000,
-                        contribution_value=100, reference_year=2025, reference_month=1, birth_year=1980, birth_month=8)
+                        contribution_length_year=20, income_age_year=50, passive_income_value=8000,
+                        contribution_value=1000, reference_year=2025, reference_month=1, birth_year=1980, birth_month=8)
+
 
 def print_hi(name):
     # Use a breakpoint in the code line below to debug your script.
@@ -47,6 +47,14 @@ def assets_projection(financial_params):
         if refresh:
             capital_contribution = age_of_contribution * [float(0)] + contribution_length * [float(0)] + (
                     time_length - contribution_length - age_of_contribution) * [float(0)]
+
+            # Adding the contribution value for the first year
+            capital_contribution[age_of_contribution_year*12: age_of_contribution_year*12+12] = 12 * [contribution_value]
+
+            # it will add the next contributions with the inflation adjustment
+            for i in range(age_of_contribution_year+1, age_of_contribution_year + contribution_length_year):
+                capital_contribution[i*12:i*12+12] = 12*[capital_contribution[12*i-1]*(1+yearly_inflation)]
+
         else:
             df_loaded = pd.read_csv(
                 'my_invest.csv',
