@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 financial_params = dict(yearly_interest=0.140830823529, yearly_inflation=0.059171235294, time_length_year=100, age_of_contribution_year=28,
                         contribution_length_year=17, income_age_year=50, passive_income_value=8000,
-                        contribution_value=100, reference_year=2008, reference_month=1, birth_year=1980, birth_month=8)
+                        contribution_value=100, reference_year=2025, reference_month=1, birth_year=1980, birth_month=8)
 
 
 def print_hi(name):
@@ -42,28 +42,41 @@ def assets_projection(financial_params):
 
     while Accumulated_amount[-1] < 1:
 
-        contribution_value = contribution_value + .1
+        contribution_value = contribution_value + 1
 
         #clear the list
-        capital_contribution = age_of_contribution * [float(0)] + contribution_length * [float(0)] + (
+        if refresh:
+            capital_contribution = age_of_contribution * [float(0)] + contribution_length * [float(0)] + (
                     time_length - contribution_length - age_of_contribution) * [float(0)]
+        else:
+            df_loaded = pd.read_csv(
+                'my_invest.csv',
+                dtype={'Capital_contribution': float},  # Set column dtypes
+                parse_dates=True  # Parse dates if present (optional)
+            )
+            capital_contribution = df_loaded['Capital_contribution'].copy()
+            capital_contribution = pd.Series(capital_contribution).fillna(float(0))
 
-        # Adding the contribution value for the first year
-        capital_contribution[age_of_contribution_year * 12: age_of_contribution_year * 12 + 12] = 12 * [
-            contribution_value]
+            # Adding the contribution value for the first year
+            for i, s in enumerate(df_loaded['Locked'][age_of_contribution_year * 12: age_of_contribution_year * 12 + 12]):
+                if not s:  # Se status for False
+                    capital_contribution[age_of_contribution_year*12+i] = contribution_value
+                    temp = contribution_value
 
-        # it will add the next contributions with the inflation adjustment
-        for i in range(age_of_contribution_year + 1, age_of_contribution_year + contribution_length_year):
-            capital_contribution[i * 12:i * 12 + 12] = 12 * [
-                round(capital_contribution[12 * i - 1] * (1 + yearly_inflation), 2)]
+            # it will add the next contributions with the inflation adjustment
+            aporte = 0
+            for h in range(age_of_contribution_year + 1, age_of_contribution_year + contribution_length_year):
+                aporte = round((aporte + temp) * (1 + yearly_inflation), 2)
+                temp = 0
+                for i, s in enumerate(df_loaded['Locked'][h * 12: h * 12 + 12]):
+                    if not s:  # Se status for False
+                        capital_contribution[h * 12 + i] = aporte
 
         #clear the list
         passive_income = (time_length - income_age) * [float(0)] + income_age * [0]
 
         # The value of first year of passive income is correct by inflation from the age of contribution to the age of retirement
-        passive_income[12 * income_age_year:12 * income_age_year + 12] = 12 * [round(
-            float(passive_income_value * (1 + yearly_inflation) ** (income_age_year - (reference_year - birth_year))),
-            2)]
+        passive_income[12 * income_age_year:12 * income_age_year + 12] = 12 * [round(float(passive_income_value * (1 + yearly_inflation) ** (income_age_year - (reference_year - birth_year))), 2)]
         for j in range(income_age_year + 1, time_length_year):
             passive_income[j * 12:j * 12 + 12] = 12 * [round(passive_income[12 * j - 1] * (1 + yearly_inflation), 2)]
 
@@ -74,8 +87,7 @@ def assets_projection(financial_params):
 
         # A new interest is taken from the new contribution, the previous accumulated amount and from the subtraction from the passive income for the next months
         for i in range(1, time_length):
-            Accumulated_amount[i] = (capital_contribution[i] + Accumulated_amount[i - 1] - passive_income[i]) * (
-                        1 + monthly_interest)
+            Accumulated_amount[i] = (capital_contribution[i] + Accumulated_amount[i - 1] - passive_income[i]) * ( 1 + monthly_interest)
 
     return capital_contribution, passive_income, Accumulated_amount
 
@@ -84,11 +96,9 @@ def get_investing_assets(country, asset_type):
     assets_list = []
     try:
         if asset_type == 'funds':
-            assets_list = investpy.funds.get_funds(
-                country)  #https://investpy.readthedocs.io/_api/funds.html
+            assets_list = investpy.funds.get_funds(country)  #https://investpy.readthedocs.io/_api/funds.html
         elif asset_type == 'stocks':
-            assets_list = investpy.stocks.get_stocks(
-                country)  #https://investpy.readthedocs.io/_api/funds.html
+            assets_list = investpy.stocks.get_stocks(country)  #https://investpy.readthedocs.io/_api/funds.html
     except:
         print(f'Wrong country: {country}')
         return None
@@ -134,23 +144,29 @@ def annual_mean_inflation(start_year, code):
 if __name__ == '__main__':
     print_hi('PyCharm')
 
+refresh = False
 
+# print(df_loaded)  # First 5 rows
+# print(df_loaded.dtypes)  # Column data types
+# print(f"The load value is {df_loaded.loc[350].iloc[0]}")
+# print(f"The load value is {df_loaded.loc[350].iloc[3]}")
+# print(f"The load value is {df_loaded.loc[351].iloc[0]}")
+# print(f"The load value is {df_loaded.loc[351].iloc[3]}")
 
-# assets_list = get_investing_assets('sweden', 'funds')
-#
-# search_results = yf.Search('0P0001Q6FG.ST')
-# info = search_results.all
-#
-# symbol_yf = info['quotes'][0]['symbol']
-# date_start = '2023-01-03'
-# date_end = "2025-01-03"
-# data = yf.download(symbol_yf, start=date_start, end=date_end)
-# print(data.head())
-# valor = data.loc[date_start, 'Close'].iloc[0]
-# print(valor)
-# print(data.tail)
+assets_list = get_investing_assets('sweden', 'funds')
+search_results = yf.Search(assets_list[190])
+info = search_results.all
 
-reference_date = dict(year = 2008, month = 8)
+symbol_yf = info['quotes'][0]['symbol']
+date_start = '2023-01-03'
+date_end = "2025-01-03"
+data = yf.download(symbol_yf, start=date_start, end=date_end)
+valor_inicial = data.loc[data.index[0], 'Close'].iloc[0]
+valor_final = data.loc[data.index[-1], 'Close'].iloc[0]
+print(valor_inicial)
+print(valor_final)
+
+reference_date = dict(year = 2008, month = 1)
 
 IGPM = annual_mean_inflation(f"{reference_date['year']}-01-01","IGPM")
 Selic = annual_mean_inflation("2024-04-01","Selic")
@@ -167,7 +183,7 @@ capital_contribution, passive_income, Accumulated_amount = assets_projection(fin
 
 # It save the lists in a excell file.
 df = pd.DataFrame(list(zip(capital_contribution, passive_income, [round(p, 2) for p in Accumulated_amount])), columns=["Capital_contribution","passive_income","Accumulated_amount"])
-df.to_excel("invest.xlsx", index=False)  # Remove `index=False` to keep row numbers
+df.to_csv("invest.csv", index=False)  # Remove `index=False` to keep row numbers
 
 years = [i * 0.5 for i in range(0, 200)]
 plt.plot(years, Accumulated_amount[0:1200:6], label='Amount of saving #1', color='red')
