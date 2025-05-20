@@ -6,21 +6,21 @@ import pandas as pd
 from bcb import sgs
 from datetime import datetime
 import matplotlib.pyplot as plt
+import time
 
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
 financial_params = dict(yearly_interest=0.13499942436095425, yearly_inflation=0.059171235294, time_length_year=100, age_of_contribution_year=28,
-                        contribution_length_year=20, income_age_year=52, passive_income_value=8000,
-                        contribution_value=1, reference_year=2025, reference_month=1, birth_year=1980, birth_month=8)
+                        contribution_length_year=20, income_age_year=50, passive_income_value=8000,
+                        contribution_value=1000, reference_year=2025, reference_month=1, birth_year=1980, birth_month=8)
 
 
 def print_hi(name):
     # Use a breakpoint in the code line below to debug your script.
     print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
 
-
-def assets_projection(financial_params, refresh=False):
+def assets_projection(financial_params, file_name, refresh=False):
     yearly_interest = financial_params['yearly_interest']
     yearly_inflation = financial_params['yearly_inflation']
     time_length_year = financial_params['time_length_year']
@@ -42,7 +42,7 @@ def assets_projection(financial_params, refresh=False):
     while Accumulated_amount[-1] < 1:
 
         contribution_value = contribution_value + 1
-
+        print(Accumulated_amount[-1])
         #clear the list
         if refresh:
             capital_contribution = age_of_contribution * [float(0)] + contribution_length * [float(0)] + (
@@ -57,7 +57,7 @@ def assets_projection(financial_params, refresh=False):
 
         else:
             df_loaded = pd.read_csv(
-                'my_invest.csv',
+                file_name,
                 dtype={'Capital_contribution': float},  # Set column dtypes
                 parse_dates=True  # Parse dates if present (optional)
             )
@@ -88,6 +88,8 @@ def assets_projection(financial_params, refresh=False):
         for j in range(income_age_year + 1, time_length_year):
             passive_income[j * 12:j * 12 + 12] = 12 * [round(passive_income[12 * j - 1] * (1 + yearly_inflation), 2)]
 
+        last_amount = Accumulated_amount[-1]
+
         # clear the list
         Accumulated_amount = time_length * [float(0)]
         # the first mount is yield
@@ -96,6 +98,12 @@ def assets_projection(financial_params, refresh=False):
         # A new interest is taken from the new contribution, the previous accumulated amount and from the subtraction from the passive income for the next months
         for i in range(1, time_length):
             Accumulated_amount[i] = (capital_contribution[i] + Accumulated_amount[i - 1] - passive_income[i]) * ( 1 + monthly_interest)
+
+        # Check if Accumulated_amount changes when the contribution value changes. Otherwise, it the loop will hange.
+        current_amount = Accumulated_amount[-1]  # Get the latest value
+        if current_amount == last_amount:
+            print("There are no time slot to increase the amount of savings.")
+            break
 
     return capital_contribution, passive_income, Accumulated_amount
 
@@ -199,80 +207,86 @@ financial_params['yearly_interest'] = itau
 financial_params['reference_year'] = reference_date['year']
 financial_params['age_of_contribution_year'] = 28
 financial_params['contribution_length_year'] = 17
-financial_params['passive_income_value'] = 4000
-capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, refresh=refresh)
+financial_params['contribution_value'] = 1
+financial_params['passive_income_value'] = 3700
+
+capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_00.csv',refresh=refresh)
 plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "red")
 
 df = pd.DataFrame(list(zip(capital_contribution, passive_income, [round(p, 2) for p in Accumulated_amount])), columns=[f"{asset_name} Capital_contribution",f"{asset_name} passive_income",f"{asset_name} Accumulated_amount"])
 
-# Finserve Global Security Fund I SEK R
-refresh = True
-asset_name = "Finserve Global Security Fund I SEK R"
-financial_params['yearly_inflation'] = IPCA
-financial_params['yearly_interest'] = 0.2679174
-financial_params['reference_year'] = reference_date['year']
-financial_params['age_of_contribution_year'] = 44
-financial_params['contribution_length_year'] = 1
-financial_params['passive_income_value'] = 1000
-
-capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, refresh=refresh)
-plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "green")
-
-df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
-df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
-df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
-
-
-# Spiltan Globalfond Investmentbolag
-refresh = True
-asset_name = "Spiltan Globalfond Investmentbolag"
-financial_params['yearly_inflation'] = IPCA
-financial_params['yearly_interest'] = 0.2605262
-financial_params['reference_year'] = reference_date['year']
-financial_params['age_of_contribution_year'] = 44
-financial_params['contribution_length_year'] = 1
-financial_params['passive_income_value'] = 1000
-
-capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, refresh=refresh)
-plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "blue")
-
-df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
-df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
-df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
-
-#Tellus Midas
-refresh = True
-asset_name = "Tellus Midas"
-financial_params['yearly_inflation'] = IPCA
-financial_params['yearly_interest'] = 0.2552236
-financial_params['reference_year'] = reference_date['year']
-financial_params['age_of_contribution_year'] = 44
-financial_params['contribution_length_year'] = 1
-financial_params['passive_income_value'] = 1000
-
-capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, refresh=refresh)
-plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "yellow")
-
-df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
-df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
-df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
-
-#East Capital Balkans A1 SEK
-refresh = True
-asset_name = "East Capital Balkans A1 SEK"
-financial_params['yearly_inflation'] = IPCA
-financial_params['yearly_interest'] = 0.2967898
-financial_params['reference_year'] = reference_date['year']
-financial_params['age_of_contribution_year'] = 44
-financial_params['contribution_length_year'] = 1
-financial_params['passive_income_value'] = 1000
-
-capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, refresh=refresh)
-plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "pink")
-
-df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
-df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
-df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
+# # Finserve Global Security Fund I SEK R
+# refresh = False
+# asset_name = "Finserve Global Security Fund I SEK R"
+# financial_params['yearly_inflation'] = IPCA
+# financial_params['yearly_interest'] = 0.2679174
+# financial_params['reference_year'] = reference_date['year']
+# financial_params['age_of_contribution_year'] = 44
+# financial_params['contribution_length_year'] = 1
+# financial_params['contribution_value'] = 1000
+# financial_params['passive_income_value'] = 1250
+#
+# capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_01.csv', refresh=refresh)
+# plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "green")
+#
+# df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
+# df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
+# df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
+#
+#
+# # Spiltan Globalfond Investmentbolag
+# refresh = False
+# asset_name = "Spiltan Globalfond Investmentbolag"
+# financial_params['yearly_inflation'] = IPCA
+# financial_params['yearly_interest'] = 0.2605262
+# financial_params['reference_year'] = reference_date['year']
+# financial_params['age_of_contribution_year'] = 44
+# financial_params['contribution_length_year'] = 1
+# financial_params['contribution_value'] = 1000
+# financial_params['passive_income_value'] = 1250
+#
+# capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_02.csv', refresh=refresh)
+# plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "blue")
+#
+# df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
+# df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
+# df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
+#
+# #Tellus Midas
+# refresh = False
+# asset_name = "Tellus Midas"
+# financial_params['yearly_inflation'] = IPCA
+# financial_params['yearly_interest'] = 0.2552236
+# financial_params['reference_year'] = reference_date['year']
+# financial_params['age_of_contribution_year'] = 44
+# financial_params['contribution_length_year'] = 1
+# financial_params['contribution_value'] = 1000
+# financial_params['passive_income_value'] = 1250
+#
+# capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_03.csv', refresh=refresh)
+# plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "yellow")
+#
+# df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
+# df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
+# df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
+#
+# #East Capital Balkans A1 SEK
+# refresh = False
+# asset_name = "East Capital Balkans A1 SEK"
+# financial_params['yearly_inflation'] = IPCA
+# financial_params['yearly_interest'] = 0.2967898
+# financial_params['reference_year'] = reference_date['year']
+# financial_params['age_of_contribution_year'] = 44
+# financial_params['contribution_length_year'] = 1
+# financial_params['contribution_value'] = 1000
+# financial_params['passive_income_value'] = 1250
+#
+# capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_04.csv', refresh=refresh)
+# plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "pink")
+#
+# df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
+# df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
+# df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
 
 
 
