@@ -42,11 +42,12 @@ def assets_projection(financial_params, file_name, refresh=False):
     monthly_interest = (1 + yearly_interest) ** (1 / 12) - 1
     time_length = time_length_year * 12
     Accumulated_amount: list[float] = time_length * [float(0)]
-
-    while Accumulated_amount[-1] < 1:
-
-        initial_contribution = initial_contribution + .1
-        print(Accumulated_amount[-1])
+    flag = 1
+    limit = 10
+    limit_superior = initial_contribution
+    limit_inferior = 0
+    while abs(Accumulated_amount[-1]) > limit or flag == 1:
+        flag = 0
         #clear the list
         if refresh:
             capital_contribution = age_of_contribution * [float(0)] + contribution_length * [float(0)] + (
@@ -96,8 +97,16 @@ def assets_projection(financial_params, file_name, refresh=False):
         Accumulated_amount[0] = (capital_contribution[0]) * (1 + monthly_interest)
 
         # A new interest is taken from the new contribution, the previous accumulated amount and from the subtraction from the passive income for the next months
-        for i in range(1, time_length):
+        for i in range(0, time_length):
             Accumulated_amount[i] = (capital_contribution[i] + Accumulated_amount[i - 1] - passive_income[i]) * ( 1 + monthly_interest)
+
+        if Accumulated_amount[-1] > limit:
+            limit_superior = initial_contribution
+        elif Accumulated_amount[-1] < -limit:
+            limit_inferior = initial_contribution
+
+        initial_contribution = (limit_superior + limit_inferior)/2
+
 
         # Check if Accumulated_amount changes when the contribution value changes. Otherwise, it the loop will hange.
         current_amount = Accumulated_amount[-1]  # Get the latest value
@@ -204,12 +213,12 @@ financial_params['yearly_interest'] = itau
 financial_params['reference_year'] = reference_date['year']
 financial_params['age_of_contribution_year'] = 44
 financial_params['contribution_length_year'] = 5
-financial_params['initial_contribution'] = 100
+financial_params['initial_contribution'] = 90000
 financial_params['passive_income_value'] = 3700
 
 capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_00.csv',refresh=refresh)
 plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "red")
-
+print(len(f" accumu len {Accumulated_amount}"))
 df = pd.DataFrame(list(zip(capital_contribution, passive_income, [round(p, 2) for p in Accumulated_amount])), columns=[f"{asset_name} Capital_contribution",f"{asset_name} passive_income",f"{asset_name} Accumulated_amount"])
 
 # # Finserve Global Security Fund I SEK R
