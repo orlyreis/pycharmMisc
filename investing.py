@@ -13,8 +13,11 @@ import time
 
 financial_params = dict(yearly_interest=0.13499942436095425, yearly_inflation=0.059171235294, time_length_year=100, age_of_contribution_year=28,
                         contribution_length_year=20, income_age_year=50, passive_income_value=8000,
-                        contribution_value=1000, reference_year=2025, reference_month=1, birth_year=1980, birth_month=8)
+                        initial_contribution=1000, reference_year=2008, reference_month=1, birth_year=1980, birth_month=8)
 
+today = datetime.now().strftime("%Y-%m-%d")
+reference_date = dict(year = 2008, month = 1)
+birth_date = dict(year = 1980, month = 8, day = 10)
 
 def print_hi(name):
     # Use a breakpoint in the code line below to debug your script.
@@ -27,33 +30,35 @@ def assets_projection(financial_params, file_name, refresh=False):
     age_of_contribution_year = financial_params['age_of_contribution_year']
     contribution_length_year = financial_params['contribution_length_year']
     income_age_year = financial_params['income_age_year']
-    contribution_value = financial_params['contribution_value']
+    initial_contribution = financial_params['initial_contribution']
     passive_income_value = financial_params['passive_income_value']
     reference_year = financial_params['reference_year']
     birth_year = financial_params['birth_year']
+    birth_month = financial_params['birth_month']
 
-    age_of_contribution = age_of_contribution_year * 12
+    age_of_contribution = (int(today[0:4]) - birth_year)*12 + int(today[5:7]) - birth_month
     contribution_length = contribution_length_year * 12
-    income_age = income_age_year * 12
+    income_age = income_age_year*12
     monthly_interest = (1 + yearly_interest) ** (1 / 12) - 1
     time_length = time_length_year * 12
     Accumulated_amount: list[float] = time_length * [float(0)]
 
     while Accumulated_amount[-1] < 1:
 
-        contribution_value = contribution_value + 1
+        initial_contribution = initial_contribution + .1
         print(Accumulated_amount[-1])
         #clear the list
         if refresh:
             capital_contribution = age_of_contribution * [float(0)] + contribution_length * [float(0)] + (
                     time_length - contribution_length - age_of_contribution) * [float(0)]
 
-            # Adding the contribution value for the first year
-            capital_contribution[age_of_contribution_year*12: age_of_contribution_year*12+12] = 12 * [contribution_value]
-
+            contribution_value = initial_contribution
             # it will add the next contributions with the inflation adjustment
-            for i in range(age_of_contribution_year+1, age_of_contribution_year + contribution_length_year):
-                capital_contribution[i*12:i*12+12] = 12*[capital_contribution[12*i-1]*(1+yearly_inflation)]
+            for i in range(age_of_contribution, age_of_contribution + contribution_length):
+                if float(i/12).is_integer():
+                    contribution_value = round(contribution_value * (1 + yearly_inflation), 10)
+
+                capital_contribution[i] = contribution_value
 
         else:
             df_loaded = pd.read_csv(
@@ -64,29 +69,24 @@ def assets_projection(financial_params, file_name, refresh=False):
             capital_contribution = df_loaded['Capital_contribution'].copy()
             capital_contribution = pd.Series(capital_contribution).fillna(float(0))
 
+            contribution_value = initial_contribution
             # Adding the contribution value for the first year
-            temp = 0
-            for i, s in enumerate(df_loaded['Locked'][age_of_contribution_year * 12: age_of_contribution_year * 12 + 12]):
-                temp = contribution_value
-                if not s:  # Se status for False
-                    capital_contribution[age_of_contribution_year*12+i] = contribution_value
+            for i in range(age_of_contribution, age_of_contribution + contribution_length):
+                if float(i/12).is_integer():
+                    contribution_value = round(contribution_value * (1 + yearly_inflation), 2)
 
-            # it will add the next contributions with the inflation adjustment
-            aporte = 0
-            for h in range(age_of_contribution_year + 1, age_of_contribution_year + contribution_length_year):
-                aporte = round((aporte + temp) * (1 + yearly_inflation), 2)
-                temp = 0
-                for i, s in enumerate(df_loaded['Locked'][h * 12: h * 12 + 12]):
-                    if not s:  # Se status for False
-                        capital_contribution[h * 12 + i] = aporte
+                if not df_loaded['Locked'][i]:  # Se status for False
+                    capital_contribution[i] = contribution_value
 
         #clear the list
         passive_income = (time_length - income_age) * [float(0)] + income_age * [0]
 
-        # The value of first year of passive income is correct by inflation from the age of contribution to the age of retirement
-        passive_income[12 * income_age_year:12 * income_age_year + 12] = 12 * [round(float(passive_income_value * (1 + yearly_inflation) ** (income_age_year - (reference_year - birth_year))), 2)]
-        for j in range(income_age_year + 1, time_length_year):
-            passive_income[j * 12:j * 12 + 12] = 12 * [round(passive_income[12 * j - 1] * (1 + yearly_inflation), 2)]
+        passive_value = round(float(passive_income_value * (1 + yearly_inflation) ** (income_age_year - (reference_year - birth_year))),2)
+        for i in range(income_age, time_length_year*12):
+            if float(i/12).is_integer():
+                passive_value = round(passive_value * (1 + yearly_inflation), 10)
+
+            passive_income[i] = passive_value
 
         last_amount = Accumulated_amount[-1]
 
@@ -130,7 +130,6 @@ def annual_mean_inflation(start_year, code):
     #IPCA	433
     #IGPM (FGV)	189
     #Selic	11
-    today = datetime.now().strftime("%y-%m-%d")
     if code == "IGPM":
         inflation = sgs.get({"IGPM": 189}, start=start_year)
     elif code == "IPCA":
@@ -185,8 +184,6 @@ valor_final = data.loc[data.index[-1], 'Close'].iloc[0]
 print(valor_inicial)
 print(valor_final)
 
-reference_date = dict(year = 2008, month = 1)
-
 # calculate the inflation and index
 IPCA = annual_mean_inflation(f"{reference_date['year']}-01-01","IPCA")
 IGPM = annual_mean_inflation(f"{reference_date['year']}-01-01","IGPM")
@@ -205,9 +202,9 @@ asset_name = "IGPM+6%"
 financial_params['yearly_inflation'] = IPCA
 financial_params['yearly_interest'] = itau
 financial_params['reference_year'] = reference_date['year']
-financial_params['age_of_contribution_year'] = 28
-financial_params['contribution_length_year'] = 17
-financial_params['contribution_value'] = 1
+financial_params['age_of_contribution_year'] = 44
+financial_params['contribution_length_year'] = 5
+financial_params['initial_contribution'] = 100
 financial_params['passive_income_value'] = 3700
 
 capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_00.csv',refresh=refresh)
@@ -223,7 +220,7 @@ df = pd.DataFrame(list(zip(capital_contribution, passive_income, [round(p, 2) fo
 # financial_params['reference_year'] = reference_date['year']
 # financial_params['age_of_contribution_year'] = 44
 # financial_params['contribution_length_year'] = 1
-# financial_params['contribution_value'] = 1000
+# financial_params['initial_contribution'] = 1000
 # financial_params['passive_income_value'] = 1250
 #
 # capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_01.csv', refresh=refresh)
@@ -242,7 +239,7 @@ df = pd.DataFrame(list(zip(capital_contribution, passive_income, [round(p, 2) fo
 # financial_params['reference_year'] = reference_date['year']
 # financial_params['age_of_contribution_year'] = 44
 # financial_params['contribution_length_year'] = 1
-# financial_params['contribution_value'] = 1000
+# financial_params['initial_contribution'] = 1000
 # financial_params['passive_income_value'] = 1250
 #
 # capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_02.csv', refresh=refresh)
@@ -260,7 +257,7 @@ df = pd.DataFrame(list(zip(capital_contribution, passive_income, [round(p, 2) fo
 # financial_params['reference_year'] = reference_date['year']
 # financial_params['age_of_contribution_year'] = 44
 # financial_params['contribution_length_year'] = 1
-# financial_params['contribution_value'] = 1000
+# financial_params['initial_contribution'] = 1000
 # financial_params['passive_income_value'] = 1250
 #
 # capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_03.csv', refresh=refresh)
@@ -278,7 +275,7 @@ df = pd.DataFrame(list(zip(capital_contribution, passive_income, [round(p, 2) fo
 # financial_params['reference_year'] = reference_date['year']
 # financial_params['age_of_contribution_year'] = 44
 # financial_params['contribution_length_year'] = 1
-# financial_params['contribution_value'] = 1000
+# financial_params['initial_contribution'] = 1000
 # financial_params['passive_income_value'] = 1250
 #
 # capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_04.csv', refresh=refresh)
