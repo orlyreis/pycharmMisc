@@ -4,7 +4,6 @@ import yfinance as yf
 import investpy
 import pandas as pd
 from bcb import sgs
-from datetime import datetime
 import matplotlib.pyplot as plt
 import time
 
@@ -13,15 +12,9 @@ import time
 
 financial_params = dict(yearly_interest=0.13499942436095425, yearly_inflation=0.059171235294, time_length_year=100, age_of_contribution_year=28,
                         contribution_length_year=20, income_age_year=50, passive_income_value=8000,
-                        initial_contribution=1000, reference_year=2008, reference_month=1, birth_year=1980, birth_month=8)
+                        reference_year=2008, reference_month=1, birth_year=1980, birth_month=8)
 
-today = datetime.now().strftime("%Y-%m-%d")
-reference_date = dict(year = 2008, month = 1)
-birth_date = dict(year = 1980, month = 8, day = 10)
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
 
 def assets_projection(financial_params, file_name, refresh=False):
     yearly_interest = financial_params['yearly_interest']
@@ -30,7 +23,7 @@ def assets_projection(financial_params, file_name, refresh=False):
     age_of_contribution_year = financial_params['age_of_contribution_year']
     contribution_length_year = financial_params['contribution_length_year']
     income_age_year = financial_params['income_age_year']
-    initial_contribution = financial_params['initial_contribution']
+    initial_contribution = 100000
     passive_income_value = financial_params['passive_income_value']
     reference_year = financial_params['reference_year']
     birth_year = financial_params['birth_year']
@@ -107,7 +100,6 @@ def assets_projection(financial_params, file_name, refresh=False):
 
         initial_contribution = (limit_superior + limit_inferior)/2
 
-
         # Check if Accumulated_amount changes when the contribution value changes. Otherwise, it the loop will hange.
         current_amount = Accumulated_amount[-1]  # Get the latest value
         if current_amount == last_amount:
@@ -118,20 +110,20 @@ def assets_projection(financial_params, file_name, refresh=False):
 
 
 def get_investing_assets(country, asset_type):
-    assets_list = []
+    #assets_list = []
     try:
         if asset_type == 'funds':
-            assets_list = investpy.funds.get_funds(country)  #https://investpy.readthedocs.io/_api/funds.html
+            df = investpy.funds.get_funds(country)  #https://investpy.readthedocs.io/_api/funds.html
         elif asset_type == 'stocks':
-            assets_list = investpy.stocks.get_stocks(country)  #https://investpy.readthedocs.io/_api/funds.html
+            df = investpy.stocks.get_stocks(country)  #https://investpy.readthedocs.io/_api/funds.html
     except:
         print(f'Wrong country: {country}')
         return None
     else:
         # Chamar a função para ler o arquivo
-        print(f'Fetching {asset_type} list from {country}')
-        symbol_list = list(assets_list['symbol'])
-        return symbol_list
+        #print(f'Fetching {asset_type} list from {country}')
+        #symbol_list = list(df['symbol'])
+        return df
 
 
 def annual_mean_inflation(start_year, code):
@@ -163,147 +155,40 @@ def annual_mean_inflation(start_year, code):
     return geo_mean
 
 def plot_yield(capital_contribution, Accumulated_amount, passive_income, years, color, name):
-    plt.plot(years, Accumulated_amount[0:1200:6], label=f'{name}: Amount of savings ', color=color)
-    plt.plot(years, passive_income[0:1200:6], label=f'{name}: Passive incomes', color=color)
-    plt.plot(years, capital_contribution[0:1200:6], label=f'{name}: Passive incomes', color=color)
+    plt.plot(years, Accumulated_amount, label=f'{name}: Amount of savings ', color=color)
+    plt.plot(years, passive_income, label=f'{name}: Passive incomes', color=color)
+    plt.plot(years, capital_contribution, label=f'{name}: Passive incomes', color=color)
+
+#Compound Growth Rate
+def compound_growth_rate(initial_value, final_value, days, period='y'):
+    cgr = (final_value/initial_value)**(1/days)-1
+    if period == 'd':
+        return cgr
+    elif period == 'm':
+        return (1+cgr)**21-1
+    elif period == 'y':
+        return (1+cgr)**252-1
+
+def sharpe_ratio(data, risk_free_rate=0.02):
+    # Passo 2: Calculate daily returns
+    daily_return = data.pct_change().dropna()
+
+    # Passo 4: Calcular métricas
+    avg_daily_return = daily_return.mean()
+    std_daily_return = daily_return.std()
+
+    # Annualização
+    yearly_return = float(avg_daily_return.iloc[0]) * 252
+    yearly_volatility = float(std_daily_return.iloc[0]) * np.sqrt(252)
+
+    # Sharpe Ratio
+    sharpe_ratio = (yearly_return - risk_free_rate) / yearly_volatility
+
+    print(f"Retorno anualizado: {yearly_return:.2%}")
+    print(f"Volatilidade anualizada: {yearly_volatility:.2%}")
+    print(f"Sharpe Ratio: {sharpe_ratio:.2f}")
+    return sharpe_ratio
 
 
 
-if __name__ == '__main__':
-    print_hi('PyCharm')
 
-
-# print(df_loaded)  # First 5 rows
-# print(df_loaded.dtypes)  # Column data types
-# print(f"The load value is {df_loaded.loc[350].iloc[0]}")
-# print(f"The load value is {df_loaded.loc[350].iloc[3]}")
-# print(f"The load value is {df_loaded.loc[351].iloc[0]}")
-# print(f"The load value is {df_loaded.loc[351].iloc[3]}")
-
-assets_list = get_investing_assets('sweden', 'funds')
-search_results = yf.Search(assets_list[190])
-info = search_results.all
-
-symbol_yf = info['quotes'][0]['symbol']
-date_start = '2023-01-03'
-date_end = "2025-01-03"
-data = yf.download(symbol_yf, start=date_start, end=date_end)
-valor_inicial = data.loc[data.index[0], 'Close'].iloc[0]
-valor_final = data.loc[data.index[-1], 'Close'].iloc[0]
-print(valor_inicial)
-print(valor_final)
-
-# calculate the inflation and index
-IPCA = annual_mean_inflation(f"{reference_date['year']}-01-01","IPCA")
-IGPM = annual_mean_inflation(f"{reference_date['year']}-01-01","IGPM")
-Selic = annual_mean_inflation("2024-04-01","Selic")
-itau = (1+IGPM)*(1+0.06) - 1
-print(f"Mean inflation IGPM: {IGPM}")
-print(f"Mean inflation IPCA: {IPCA}")
-print(f"Mean inflation SELIC: {Selic}")
-print(f"Mean yield IGPM+6: {itau}")
-
-years = [i * 0.5 for i in range(0, 200)]
-
-# IGPM + 6%
-refresh = False
-asset_name = "IGPM+6%"
-financial_params['yearly_inflation'] = IPCA
-financial_params['yearly_interest'] = itau
-financial_params['reference_year'] = reference_date['year']
-financial_params['age_of_contribution_year'] = 44
-financial_params['contribution_length_year'] = 5
-financial_params['initial_contribution'] = 90000
-financial_params['passive_income_value'] = 3700
-
-capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_00.csv',refresh=refresh)
-plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "red")
-print(len(f" accumu len {Accumulated_amount}"))
-df = pd.DataFrame(list(zip(capital_contribution, passive_income, [round(p, 2) for p in Accumulated_amount])), columns=[f"{asset_name} Capital_contribution",f"{asset_name} passive_income",f"{asset_name} Accumulated_amount"])
-
-# # Finserve Global Security Fund I SEK R
-# refresh = False
-# asset_name = "Finserve Global Security Fund I SEK R"
-# financial_params['yearly_inflation'] = IPCA
-# financial_params['yearly_interest'] = 0.2679174
-# financial_params['reference_year'] = reference_date['year']
-# financial_params['age_of_contribution_year'] = 44
-# financial_params['contribution_length_year'] = 1
-# financial_params['initial_contribution'] = 1000
-# financial_params['passive_income_value'] = 1250
-#
-# capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_01.csv', refresh=refresh)
-# plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "green")
-#
-# df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
-# df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
-# df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
-#
-#
-# # Spiltan Globalfond Investmentbolag
-# refresh = False
-# asset_name = "Spiltan Globalfond Investmentbolag"
-# financial_params['yearly_inflation'] = IPCA
-# financial_params['yearly_interest'] = 0.2605262
-# financial_params['reference_year'] = reference_date['year']
-# financial_params['age_of_contribution_year'] = 44
-# financial_params['contribution_length_year'] = 1
-# financial_params['initial_contribution'] = 1000
-# financial_params['passive_income_value'] = 1250
-#
-# capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_02.csv', refresh=refresh)
-# plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "blue")
-#
-# df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
-# df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
-# df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
-#
-# #Tellus Midas
-# refresh = False
-# asset_name = "Tellus Midas"
-# financial_params['yearly_inflation'] = IPCA
-# financial_params['yearly_interest'] = 0.2552236
-# financial_params['reference_year'] = reference_date['year']
-# financial_params['age_of_contribution_year'] = 44
-# financial_params['contribution_length_year'] = 1
-# financial_params['initial_contribution'] = 1000
-# financial_params['passive_income_value'] = 1250
-#
-# capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_03.csv', refresh=refresh)
-# plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "yellow")
-#
-# df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
-# df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
-# df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
-#
-# #East Capital Balkans A1 SEK
-# refresh = False
-# asset_name = "East Capital Balkans A1 SEK"
-# financial_params['yearly_inflation'] = IPCA
-# financial_params['yearly_interest'] = 0.2967898
-# financial_params['reference_year'] = reference_date['year']
-# financial_params['age_of_contribution_year'] = 44
-# financial_params['contribution_length_year'] = 1
-# financial_params['initial_contribution'] = 1000
-# financial_params['passive_income_value'] = 1250
-#
-# capital_contribution, passive_income, Accumulated_amount = assets_projection(financial_params, file_name='asset_04.csv', refresh=refresh)
-# plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name=asset_name, color = "pink")
-#
-# df = pd.concat([pd.Series(passive_income, name=f"{asset_name} passive_income"), df], axis=1)
-# df = pd.concat([pd.Series(Accumulated_amount, name=f"{asset_name} Accumulated_amount"), df], axis=1)
-# df = pd.concat([pd.Series(capital_contribution, name=f"{asset_name} capital_contribution"), df], axis=1)
-
-
-
-# It save the lists in a excell file.
-df.to_csv("invest.csv", index=False)  # Remove `index=False` to keep row numbers
-
-plt.title('Yield Projection (2024)')
-plt.xlabel('Month')
-plt.ylabel('Value (BRL)')
-plt.legend()
-plt.grid()
-plt.show()
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
