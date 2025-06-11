@@ -4,13 +4,15 @@ import yfinance as yf
 import investpy
 import pandas as pd
 from bcb import sgs
+from requests import Session
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from datetime import datetime
 import matplotlib.pyplot as plt
-import time
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+today = datetime.now().strftime("%Y-%m-%d")
 
-financial_params = dict(yearly_interest=0.13499942436095425, yearly_inflation=0.059171235294, time_length_year=100, age_of_contribution_year=28,
+financial_params = dict(yearly_interest=0.13499942436095425, yearly_inflation=0.059171235294, time_length_year=100,
                         contribution_length_year=20, income_age_year=50, passive_income_value=8000,
                         reference_year=2008, reference_month=1, birth_year=1980, birth_month=8)
 
@@ -20,7 +22,6 @@ def assets_projection(financial_params, file_name, refresh=False):
     yearly_interest = financial_params['yearly_interest']
     yearly_inflation = financial_params['yearly_inflation']
     time_length_year = financial_params['time_length_year']
-    age_of_contribution_year = financial_params['age_of_contribution_year']
     contribution_length_year = financial_params['contribution_length_year']
     income_age_year = financial_params['income_age_year']
     initial_contribution = 100000
@@ -106,7 +107,7 @@ def assets_projection(financial_params, file_name, refresh=False):
             print("There are no time slot to increase the amount of savings.")
             break
 
-    return capital_contribution, passive_income, Accumulated_amount
+    return pd.Series(capital_contribution), pd.Series(Accumulated_amount), pd.Series(passive_income)
 
 
 def get_investing_assets(country, asset_type):
@@ -154,10 +155,10 @@ def annual_mean_inflation(start_year, code):
 
     return geo_mean
 
-def plot_yield(capital_contribution, Accumulated_amount, passive_income, years, color, name):
-    plt.plot(years, Accumulated_amount, label=f'{name}: Amount of savings ', color=color)
-    plt.plot(years, passive_income, label=f'{name}: Passive incomes', color=color)
-    plt.plot(years, capital_contribution, label=f'{name}: Passive incomes', color=color)
+def plot_yield(capital_contribution, Accumulated_amount, passive_income, years, name):
+    plt.plot(years, Accumulated_amount, label=f'{name}: Amount of savings ')
+    #plt.plot(years, passive_income, label=f'{name}: Passive incomes')
+    #plt.plot(years, capital_contribution, label=f'{name}: Passive incomes')
 
 #Compound Growth Rate
 def compound_growth_rate(initial_value, final_value, days, period='y'):
@@ -169,7 +170,7 @@ def compound_growth_rate(initial_value, final_value, days, period='y'):
     elif period == 'y':
         return (1+cgr)**252-1
 
-def sharpe_ratio(data, risk_free_rate=0.02):
+def sharpe_ratio_calculator(data, risk_free_rate=0.02):
     # Passo 2: Calculate daily returns
     daily_return = data.pct_change().dropna()
 
@@ -190,5 +191,91 @@ def sharpe_ratio(data, risk_free_rate=0.02):
     return sharpe_ratio
 
 
+def safe_download(ticker, start, end):
+    try:
+        #session = Session()
+        retry = Retry(total=10, backoff_factor=1)
+        adapter = HTTPAdapter(max_retries=retry)
+        #session.mount('http://', adapter)
+        #session.mount('https://', adapter)
 
+        data = yf.download(
+            ticker,
+            start=start,
+            end=end,
+            timeout=30,
+            #session=session
+        )
+        return data
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+def get_asset_key_data(country = 'luxembourg', funds = 'funds'):
+
+    df = get_investing_assets(country=country, asset_type=funds)
+
+    for i in range(len(df)):
+        date_start = '2022-07-01'
+        date_end = today
+
+        search_results = yf.Search(df.loc[i]['symbol'])
+        info = search_results.all
+        try:
+            #shortname_yf = info['quotes'][0]['shortname']
+            symbol_yf = info['quotes'][0]['symbol']
+        except IndexError:
+            continue
+
+        try:
+            data = safe_download(symbol_yf, start=date_start, end=date_end)
+        except Exception as e:
+            print(f"There is no data for this asset: {str(e)}")
+        else:
+            date_start = str(data.index[0])[0:10]
+            date_end = str(data.index[-1])[0:10]
+
+            initial_value = data.loc[data.index[0], 'Close'].iloc[0]
+            final_value = data.loc[data.index[-1], 'Close'].iloc[0]
+
+            rate=compound_growth_rate(initial_value=initial_value, final_value=final_value, days=len(data.index), period='y')
+
+            print(f"{i} {df.loc[i]['isin']} yearly growth rate is {rate}")
+            print(f'    {date_start} = {initial_value}')
+            print(f'    {date_end} = {final_value}')
+
+            sharpe_ratio = sharpe_ratio_calculator(data['Close'], risk_free_rate=0.044)
+            df.loc[i, "cagr"] = rate
+            df.loc[i, "sharpe_ratio"] = sharpe_ratio
+
+
+    df.to_csv(
+        f'funds_{country}.csv',  # File path/name
+        index=True,             # Exclude row indices
+        float_format='%.4f',    # Round floats to 2 decimal places
+        encoding='utf-8'        # Set encoding (optional)
+    )
+
+
+def generate_csv(asset_name, capital_contribution, accumulated_amount, passive_income):
+    #it creates the csv file with contribution, accumulated amount and passive income
+    # Criar MultiIndex para colunas
+    colunas = pd.MultiIndex.from_tuples([
+        (f'{asset_name}', 'Contribution'),
+        (f'{asset_name}', 'Accumulated Amount'),
+        (f'{asset_name}', 'Passive Income')
+    ])
+
+    df = pd.DataFrame({
+        (f'{asset_name}', 'Contribution'): capital_contribution.round(2),
+        (f'{asset_name}', 'Accumulated Amount'): accumulated_amount.round(2),
+        (f'{asset_name}', 'Passive Income'): passive_income.round(2)
+    })
+
+    # Reorganiza as colunas na ordem definida pelo MultiIndex (opcional)
+    df = df[colunas]
+    df.columns.names = ['Asset', '']
+
+    df.to_csv(f"whale_{asset_name}.csv", index=True)  # Remove `index=False` to keep row numbers
+    print(df)
 
